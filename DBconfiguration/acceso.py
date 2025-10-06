@@ -1,12 +1,13 @@
 import psycopg2
-import getpass #vuelve invisible en pantalla un input
+import getpass  # vuelve invisible en pantalla un input
 
 # Configuración de conexión a la base de datos en Docker
 DB_HOST = "localhost"
 DB_PORT = "5432"
 DB_NAME = "credenciales"
-DB_USER = 'Admin'
+DB_USER = "Admin"
 DB_PASSWORD = "p4ssw0rdDB"
+
 
 def conectar_db():
     """Conecta a la base de datos PostgreSQL y retorna la conexión."""
@@ -16,7 +17,7 @@ def conectar_db():
             port=DB_PORT,
             database=DB_NAME,
             user=DB_USER,
-            password=DB_PASSWORD
+            password=DB_PASSWORD,
         )
         return conn
     except Exception as e:
@@ -25,7 +26,7 @@ def conectar_db():
 
 
 def obtener_datos_usuario(username, password):
-    #Consulta la base de datos para obtener los datos de un usuario a partir de sus credenciales.
+    # Consulta la base de datos para obtener los datos de un usuario a partir de sus credenciales.
     conn = conectar_db()
     if not conn:
         return
@@ -57,10 +58,93 @@ def obtener_datos_usuario(username, password):
     except Exception as e:
         print("Error al consultar la base de datos:", e)
 
+
+def insertar_usuario(
+    nombreNuevo, correoNuevo, telefonoNuevo, fechaNuevo, usuario, password
+):
+    conn = conectar_db()
+    # si no logra conectarse no sigue
+    if not conn:
+        return
+
+    try:
+        cursor = conn.cursor()
+        # Insertar nuevo usuario en la tabla usuarios
+        cursor.execute(
+            """
+        INSERT INTO usuarios (nombre, correo, telefono, fecha_nacimiento)
+        VALUES (%s, %s, %s, %s) RETURNING id_usuario;
+        """,
+            (nombreNuevo, correoNuevo, telefonoNuevo, fechaNuevo),
+        )
+        # guardar el id del nuevo usuario
+        id_usuario = cursor.fetchone()[0]
+
+        # Insertar credenciales en la tabla credenciales
+        cursor.execute(
+            """
+        INSERT INTO credenciales (id_usuario, username, password_hash)
+        VALUES (%s, %s, %s);
+        """,
+            (id_usuario, usuario, password),
+        )
+        # Confirmar los cambios en la base de datos
+        conn.commit()
+        print("\nNuevo usuario insertado con éxito.")
+    # Si hay error, no se hace el commit
+    except Exception as e:
+        print("Error al insertar el nuevo usuario:", e)
+        # Revierte cualquier cambio si hay error
+        conn.rollback()
+
+    finally:
+        cursor.close()
+        conn.close()
+
+def actualizar_correo(id_usuario, nuevo_correo):
+    conn = conectar_db()
+    if not conn:
+        return
+    try:
+        cursor = conn.cursor()
+        # Actualizar el correo del usuario con el id proporcionado
+        cursor.execute(
+            """
+        UPDATE usuarios
+        SET correo = %s
+        WHERE id_usuario = %s;
+        """,
+            (nuevo_correo, id_usuario),
+        )
+        # Confirmar los cambios en la base de datos
+        conn.commit()
+        if cursor.rowcount > 0:
+            print("\nCorreo actualizado con éxito.")
+        else:
+            print("\nNo se encontró un usuario con el ID proporcionado.")
+    except Exception as e:
+        print("Error al actualizar el correo:", e)
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
 if __name__ == "__main__":
-    print("Inicio de sesión en la base de datos")
+    #    print("Inicio de sesión en la base de datos")
     # Solicitar credenciales al usuario
-    user = input("Ingrese su usuario: ")
-    pwd = getpass.getpass("Ingrese su contraseña: ")#No muestra la contraseña a escribir
-    #Consultar base de datos
-    obtener_datos_usuario(user, pwd)
+    #    user = input("Ingrese su usuario: ")
+    #    pwd = getpass.getpass("Ingrese su contraseña: ")#No muestra la contraseña a escribir
+    #    #Consultar base de datos
+    #    obtener_datos_usuario(user, pwd)
+    #    print("insertar usuario")
+    #nombreNuevo = input("ingrese nombre")
+    #correoNuevo = input("ingrese correo")
+    #telefonoNuevo = input("ingrese telefono")
+    #fechaNuevo = input("ingrese fecha de nacimiento")
+    #usuario = input("ingrese usuario")
+    #password = getpass.getpass("ingrese contraseña")
+    #insertar_usuario(nombreNuevo, correoNuevo, telefonoNuevo, fechaNuevo, usuario, password)
+    print("Actualiza correo")
+    id_usuario = input("ingrese id usuario a actualizar")
+    nuevo_correo = input("ingrese nuevo correo")
+    actualizar_correo(id_usuario, nuevo_correo) 
